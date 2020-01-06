@@ -1,10 +1,10 @@
 $EveLogDirectory = Join-Path -Path $HOME -ChildPath "\Documents\EVE\logs\Gamelogs"
-
+$CentralServer = "http://192.168.1.100:53000"
 
 #region Discover existing logs
 
 #Get log files, sort by date, filter out "no character" files
-$LogFiles = Get-ChildItem $EveLogDirectory | ?{get-content $_.FullName | Select-String -Pattern "^\s*Listener:"} | sort LastWriteTime
+$LogFiles = Get-ChildItem $EveLogDirectory | where {get-content $_.FullName | Select-String -Pattern "^\s*Listener:"} | sort LastWriteTime
 
 #group all files by character
 $characters = @()
@@ -27,12 +27,12 @@ foreach($character in $LogsByCharacter.Keys) {
 
 #region register watcher for new logs (for newly connected chars or client restarts)
 
-$Watcher = New-Object IO.FileSystemWatcher $EveLogDirectory, "*.txt" -Property @{ 
+$Watcher = New-Object IO.FileSystemWatcher $EveLogDirectory, "*.txt" -Property @{
     IncludeSubdirectories = $false
     NotifyFilter = [IO.NotifyFilters]'FileName'
 }
 
-$onCreated = Register-ObjectEvent $Watcher -EventName Created -SourceIdentifier FileCreated -Action {
+Register-ObjectEvent $Watcher -EventName Created -SourceIdentifier FileCreated -Action {
     $listener = (Select-String -Path $Event.SourceEventArgs.FullPath -Pattern "^\s*Listener:\s*(.*)\s*$").Matches.Groups[1].Value
     $CurrentLogByCharacter[$listener] = $Event.SourceEventArgs.FullPath
 }
@@ -57,6 +57,7 @@ while($true) {
                 Character = $character
                 LogLine = $line
             }
+            Invoke-WebRequest $CentralServerURI -Method POST -Body $Body
         }
     }
 }
